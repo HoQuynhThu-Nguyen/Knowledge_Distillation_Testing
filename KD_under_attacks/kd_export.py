@@ -5,12 +5,7 @@ from sklearn.metrics import confusion_matrix, classification_report, ConfusionMa
 from mvtec import trainloader, valloader, testloader
 
 ###################################################
-# Check if GPU is available, and if not, use the CPU
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-if torch.cuda.is_available(): # Should return True 
-    print(f"Using GPU: {torch.cuda.get_device_name(0)}") # Should show your GPU name
-else:
-    print("Using CPU")
 ###################################################
 # Deeper neural network class to be used as teacher:
 class DeepNN(nn.Module):
@@ -134,6 +129,49 @@ def test(model, testloader, device):
 
     return cm, report
 
+
+###################################################
+print("Instantiate the teacher model.")
+torch.manual_seed(42)
+nn_deep = DeepNN(num_classes=15).to(device)
+print("Cross-entropy runs with teacher model: ")
+train_deep = train(nn_deep, trainloader, valloader, epochs=10, learning_rate=0.001, device=device)
+test_deep = test(nn_deep, testloader, device)
+test_accuracy_deep = test_deep[1]["accuracy"] * 100
+print(f"Teacher Accuracy: {test_accuracy_deep:.2f}%")
+
+
+###################################################
+print("Instantiate the student model.")
+torch.manual_seed(42)
+nn_light = LightNN(num_classes=15).to(device)
+print("Instantiate a copy of the student model.")
+torch.manual_seed(42)
+new_nn_light = LightNN(num_classes=15).to(device)
+print("######################################################################")
+
+# # Print the norm of the first layer of the initial lightweight model
+# print("To ensure we have created a copy of the student network, we inspect the norm of its first layer.")
+# print("If it matches, then we are safe to conclude that the networks are indeed the same.")
+# print("Norm of 1st layer of nn_light:", torch.norm(nn_light.features[0].weight).item())
+# print("Norm of 1st layer of new_nn_light:", torch.norm(new_nn_light.features[0].weight).item())
+
+# print("######################################################################")
+# print("The total number of parameters in each model")
+# total_params_deep = "{:,}".format(sum(p.numel() for p in nn_deep.parameters()))
+# print(f"Teacher model parameters: {total_params_deep}")
+# total_params_light = "{:,}".format(sum(p.numel() for p in nn_light.parameters()))
+# print(f"Student model parameters: {total_params_light}")
+
+print()
+print("######################################################################")
+print("Cross-entropy runs with student model: ")
+train_light_ce = train(nn_light, trainloader, valloader, epochs=10, learning_rate=0.001, device=device)
+test_light_ce = test(nn_light, testloader, device)
+test_accuracy_light_ce = test_light_ce[1]["accuracy"] * 100
+print(f"Student Accuracy: {test_accuracy_light_ce:.2f}%")
+
+###################################################
 def train_knowledge_distillation(teacher, student, trainloader, valloader, epochs, learning_rate, T, soft_target_loss_weight, ce_loss_weight, device):
     ce_loss = nn.CrossEntropyLoss()
     optimizer = optim.Adam(student.parameters(), lr=learning_rate)
@@ -194,73 +232,30 @@ def train_knowledge_distillation(teacher, student, trainloader, valloader, epoch
 
 
 ###################################################
-if __name__ == "__main__":
-    print("Instantiate the teacher model.")
-    torch.manual_seed(42)
-    nn_deep = DeepNN(num_classes=15).to(device)
-    print("Cross-entropy runs with teacher model: ")
-    train_deep = train(nn_deep, trainloader, valloader, epochs=10, learning_rate=0.001, device=device)
-    test_deep = test(nn_deep, testloader, device)
-    test_accuracy_deep = test_deep[1]["accuracy"] * 100
-    print(f"Teacher Accuracy: {test_accuracy_deep:.2f}%")
+print("Cross-entropy runs with the copy of the student model: ")
+# Apply ``train_knowledge_distillation`` with a temperature of 2. Arbitrarily set the weights to 0.75 for CE and 0.25 for distillation loss.
+train_light_ce_and_kd = train_knowledge_distillation(teacher=nn_deep, student=new_nn_light, train_loader=trainloader, val_loader=valloader, epochs=10, learning_rate=0.001, T=2, soft_target_loss_weight=0.25, ce_loss_weight=0.75, device=device)
+test_light_ce_and_kd = test(new_nn_light, testloader, device)
+test_accuracy_light_ce_and_kd = test_light_ce_and_kd[1]["accuracy"] * 100
+precision_light_ce_and_kd = test_light_ce_and_kd[1]["weighted avg"]["precision"]
+recall_light_ce_and_kd = test_light_ce_and_kd[1]["weighted avg"]["recall"]
+f1_light_ce_and_kd = test_light_ce_and_kd[1]["weighted avg"]["f1-score"]
 
+# Compare the student test accuracy with and without the teacher, after distillation
+# print("-----------------------------------------")
+# print(f"Teacher accuracy: {test_accuracy_deep:.2f}%")
+# print(f"Student accuracy without teacher: {test_accuracy_light_ce:.2f}%")
 
-    ###################################################
-    print("Instantiate the student model.")
-    torch.manual_seed(42)
-    nn_light = LightNN(num_classes=15).to(device)
-    print("Instantiate a copy of the student model.")
-    torch.manual_seed(42)
-    new_nn_light = LightNN(num_classes=15).to(device)
-    print("######################################################################")
+print("-----------------------------------------")
+print(f"Student accuracy with CE + KD:")
+print(f"Accuracy: {test_accuracy_light_ce_and_kd:.2f}%")
+# Print other value metrics:
+print(f"Precision: {precision_light_ce_and_kd:.2f}")
+print(f"Recall: {recall_light_ce_and_kd:.2f}")
+print(f"F1 Score: {f1_light_ce_and_kd:.2f}")
 
-    # # Print the norm of the first layer of the initial lightweight model
-    # print("To ensure we have created a copy of the student network, we inspect the norm of its first layer.")
-    # print("If it matches, then we are safe to conclude that the networks are indeed the same.")
-    # print("Norm of 1st layer of nn_light:", torch.norm(nn_light.features[0].weight).item())
-    # print("Norm of 1st layer of new_nn_light:", torch.norm(new_nn_light.features[0].weight).item())
+###################################################
+torch.save(nn_light.state_dict(), "student_model.pth")
+torch.save(new_nn_light.state_dict(), "student_model_KD.pth")
 
-    # print("######################################################################")
-    # print("The total number of parameters in each model")
-    # total_params_deep = "{:,}".format(sum(p.numel() for p in nn_deep.parameters()))
-    # print(f"Teacher model parameters: {total_params_deep}")
-    # total_params_light = "{:,}".format(sum(p.numel() for p in nn_light.parameters()))
-    # print(f"Student model parameters: {total_params_light}")
-
-    print()
-    print("######################################################################")
-    print("Cross-entropy runs with student model: ")
-    train_light_ce = train(nn_light, trainloader, valloader, epochs=10, learning_rate=0.001, device=device)
-    test_light_ce = test(nn_light, testloader, device)
-    test_accuracy_light_ce = test_light_ce[1]["accuracy"] * 100
-    print(f"Student Accuracy: {test_accuracy_light_ce:.2f}%")
-
-
-    ###################################################
-    print("Cross-entropy runs with the copy of the student model: ")
-    # Apply ``train_knowledge_distillation`` with a temperature of 2. Arbitrarily set the weights to 0.75 for CE and 0.25 for distillation loss.
-    train_light_ce_and_kd = train_knowledge_distillation(teacher=nn_deep, student=new_nn_light, trainloader=trainloader, valloader=valloader, epochs=10, learning_rate=0.001, T=2, soft_target_loss_weight=0.25, ce_loss_weight=0.75, device=device)
-    test_light_ce_and_kd = test(new_nn_light, testloader, device)
-    test_accuracy_light_ce_and_kd = test_light_ce_and_kd[1]["accuracy"] * 100
-    precision_light_ce_and_kd = test_light_ce_and_kd[1]["weighted avg"]["precision"]
-    recall_light_ce_and_kd = test_light_ce_and_kd[1]["weighted avg"]["recall"]
-    f1_light_ce_and_kd = test_light_ce_and_kd[1]["weighted avg"]["f1-score"]
-
-    # Compare the student test accuracy with and without the teacher, after distillation
-    # print("-----------------------------------------")
-    # print(f"Teacher accuracy: {test_accuracy_deep:.2f}%")
-    # print(f"Student accuracy without teacher: {test_accuracy_light_ce:.2f}%")
-
-    print("-----------------------------------------")
-    print(f"Student accuracy with CE + KD:")
-    print(f"Accuracy: {test_accuracy_light_ce_and_kd:.2f}%")
-    # Print other value metrics:
-    print(f"Precision: {precision_light_ce_and_kd:.2f}")
-    print(f"Recall: {recall_light_ce_and_kd:.2f}")
-    print(f"F1 Score: {f1_light_ce_and_kd:.2f}")
-
-    ###################################################
-    torch.save(nn_light.state_dict(), "student_model.pth")
-    torch.save(new_nn_light.state_dict(), "student_model_KD.pth")
-
-    print("Model saved as student_model.pth and student_model_KD.pth")
+print("Model saved as student_model.pth and student_model_KD.pth")
