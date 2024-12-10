@@ -90,7 +90,7 @@ def train(model, trainloader, valloader, epochs, learning_rate, device):
 
         avg_train_loss = running_loss / len(trainloader)
         train_losses.append(avg_train_loss)
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_train_loss}")
+        print(f"Epoch {epoch+1}/{epochs}, Training Loss: {avg_train_loss}")
 
         # Validation Step
         val_loss = 0.0
@@ -103,6 +103,7 @@ def train(model, trainloader, valloader, epochs, learning_rate, device):
 
         avg_val_loss = val_loss / len(valloader)  # Average validation loss
         val_losses.append(avg_val_loss)
+        print(f"Epoch {epoch+1}/{epochs}, Validation Loss: {avg_val_loss:.4f}")
     return train_losses, val_losses 
 
 def test(model, testloader, device):
@@ -131,6 +132,8 @@ def test(model, testloader, device):
 
 
 ###################################################
+print()
+print("######################################################################")
 print("Instantiate the teacher model.")
 torch.manual_seed(42)
 nn_deep = DeepNN(num_classes=15).to(device)
@@ -148,7 +151,7 @@ nn_light = LightNN(num_classes=15).to(device)
 print("Instantiate a copy of the student model.")
 torch.manual_seed(42)
 new_nn_light = LightNN(num_classes=15).to(device)
-print("######################################################################")
+
 
 # # Print the norm of the first layer of the initial lightweight model
 # print("To ensure we have created a copy of the student network, we inspect the norm of its first layer.")
@@ -214,7 +217,7 @@ def train_knowledge_distillation(teacher, student, trainloader, valloader, epoch
             running_loss += loss.item()
         avg_train_loss = running_loss / len(trainloader)
         train_losses.append(avg_train_loss)
-        print(f"Epoch {epoch+1}/{epochs}, Loss: {avg_train_loss}")
+        print(f"Epoch {epoch+1}/{epochs}, Training Loss: {avg_train_loss}")
 
         # Validation Step
         val_loss = 0.0
@@ -232,9 +235,11 @@ def train_knowledge_distillation(teacher, student, trainloader, valloader, epoch
 
 
 ###################################################
-print("Cross-entropy runs with the copy of the student model: ")
+print()
+print("######################################################################")
+print("Knowledge Distillation runs with the copy of the student model: ")
 # Apply ``train_knowledge_distillation`` with a temperature of 2. Arbitrarily set the weights to 0.75 for CE and 0.25 for distillation loss.
-train_light_ce_and_kd = train_knowledge_distillation(teacher=nn_deep, student=new_nn_light, train_loader=trainloader, val_loader=valloader, epochs=10, learning_rate=0.001, T=2, soft_target_loss_weight=0.25, ce_loss_weight=0.75, device=device)
+train_light_ce_and_kd = train_knowledge_distillation(teacher=nn_deep, student=new_nn_light, trainloader=trainloader, valloader=valloader, epochs=10, learning_rate=0.001, T=2, soft_target_loss_weight=0.25, ce_loss_weight=0.75, device=device)
 test_light_ce_and_kd = test(new_nn_light, testloader, device)
 test_accuracy_light_ce_and_kd = test_light_ce_and_kd[1]["accuracy"] * 100
 precision_light_ce_and_kd = test_light_ce_and_kd[1]["weighted avg"]["precision"]
@@ -255,7 +260,8 @@ print(f"Recall: {recall_light_ce_and_kd:.2f}")
 print(f"F1 Score: {f1_light_ce_and_kd:.2f}")
 
 ###################################################
+torch.save(nn_deep.state_dict(), "teacher_model.pth")
 torch.save(nn_light.state_dict(), "student_model.pth")
 torch.save(new_nn_light.state_dict(), "student_model_KD.pth")
 
-print("Model saved as student_model.pth and student_model_KD.pth")
+print("Model saved as teacher_model.pth, student_model.pth and student_model_KD.pth")
