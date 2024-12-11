@@ -52,27 +52,28 @@ for tool in tools:
     train_count = 0
     test_count = 0
 
-    if os.path.exists(train_good_path):
-        for img_file in os.listdir(train_good_path):
-            if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                shutil.copy(
-                    os.path.join(train_good_path, img_file),
-                    os.path.join(train_tool_output, img_file)
-                )
-                train_count += 1
+    if os.path.exists(train_tool_output) == False and os.path.exists(train_tool_output) == False:
+        if os.path.exists(train_good_path):
+            for img_file in os.listdir(train_good_path):
+                if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    shutil.copy(
+                        os.path.join(train_good_path, img_file),
+                        os.path.join(train_tool_output, img_file)
+                    )
+                    train_count += 1
 
-    if os.path.exists(test_good_path):
-        for img_file in os.listdir(test_good_path):
-            if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
-                shutil.copy(
-                    os.path.join(test_good_path, img_file),
-                    os.path.join(test_tool_output, img_file)
-                )
-                test_count += 1
+        if os.path.exists(test_good_path):
+            for img_file in os.listdir(test_good_path):
+                if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    shutil.copy(
+                        os.path.join(test_good_path, img_file),
+                        os.path.join(test_tool_output, img_file)
+                    )
+                    test_count += 1
 
-    table_data.append([tool, train_count, test_count])
+        table_data.append([tool, train_count, test_count])
 
-print(tabulate(table_data, headers="firstrow", tablefmt="grid"))
+        print(tabulate(table_data, headers="firstrow", tablefmt="grid"))
 
 classes = sorted(tools)
 class_to_idx = {cls_name: idx for idx, cls_name in enumerate(classes)}
