@@ -167,7 +167,7 @@ print()
 print("######################################################################")
 print("Instantiate the teacher model.")
 torch.manual_seed(42)
-nn_deep = DeepNN(num_classes=15).to(device)
+nn_deep = DeepNN(num_classes=10).to(device)
 print("Cross-entropy runs with teacher model: ")
 train_deep = train(nn_deep, trainloader, valloader, epochs=10, learning_rate=0.001, device=device)
 test_deep = test(nn_deep, testloader, device)
@@ -178,10 +178,10 @@ print(f"Teacher Accuracy: {test_accuracy_deep:.2f}%")
 ###################################################
 print("Instantiate the student model.")
 torch.manual_seed(42)
-nn_light = LightNN(num_classes=15).to(device)
+nn_light = LightNN(num_classes=10).to(device)
 print("Instantiate a copy of the student model.")
 torch.manual_seed(42)
-new_nn_light = LightNN(num_classes=15).to(device)
+new_nn_light = LightNN(num_classes=10).to(device)
 
 
 # # Print the norm of the first layer of the initial lightweight model
