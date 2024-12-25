@@ -1,9 +1,8 @@
 import torch
 import torch.nn as nn
-import torch.optim as optim
 import torch.nn.functional as F
 
-# Deeper neural network class to be used as teacher:
+# Teacher Model: DeepNN
 class DeepNN(nn.Module):
     def __init__(self, num_classes=10):
         super(DeepNN, self).__init__()
@@ -32,7 +31,7 @@ class DeepNN(nn.Module):
         x = self.classifier(x)
         return x
 
-# Lightweight neural network class to be used as student:
+# Student Model: LightNN
 class LightNN(nn.Module):
     def __init__(self, num_classes=10):
         super(LightNN, self).__init__()
@@ -56,9 +55,8 @@ class LightNN(nn.Module):
         x = torch.flatten(x, 1)
         x = self.classifier(x)
         return x
-    
-#-------------------------------------------------------#
-#SqueezeNet-Inspired Model
+
+# SqueezeNet-Inspired Model: MiniSqueezeNet
 class FireModule(nn.Module):
     def __init__(self, in_channels, squeeze_channels, expand_channels):
         super(FireModule, self).__init__()
@@ -66,16 +64,12 @@ class FireModule(nn.Module):
             nn.Conv2d(in_channels, squeeze_channels, kernel_size=1),
             nn.ReLU(),
         )
-        self.expand = nn.Sequential(
-            nn.Conv2d(squeeze_channels, expand_channels, kernel_size=1),
-            nn.ReLU(inplace=True),
-            nn.Conv2d(squeeze_channels, expand_channels, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
-        )
+        self.expand_1x1 = nn.Conv2d(squeeze_channels, expand_channels, kernel_size=1)
+        self.expand_3x3 = nn.Conv2d(squeeze_channels, expand_channels, kernel_size=3, padding=1)
 
     def forward(self, x):
         x = self.squeeze(x)
-        return torch.cat([self.expand[0](x), self.expand[1](x)], 1)
+        return torch.cat([self.expand_1x1(x), self.expand_3x3(x)], 1)
 
 class MiniSqueezeNet(nn.Module):
     def __init__(self, num_classes=10):
@@ -98,8 +92,8 @@ class MiniSqueezeNet(nn.Module):
         x = self.features(x)
         x = self.classifier(x)
         return x
-    
-#EfficientNet-Inspired Model
+
+# EfficientNet-Inspired Model: MiniEfficientNet
 class SEBlock(nn.Module):
     def __init__(self, in_channels, reduction=4):
         super(SEBlock, self).__init__()
@@ -120,26 +114,26 @@ class MiniEfficientNet(nn.Module):
             nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1),
             nn.BatchNorm2d(16),
             nn.SiLU(inplace=True),
-            nn.Conv2d(16, 16, kernel_size=3, stride=2, padding=1, groups=4),  # Ensure out_channels divisible by groups
+            nn.Conv2d(16, 16, kernel_size=3, stride=2, padding=1, groups=4),
             nn.BatchNorm2d(16),
             nn.SiLU(inplace=True),
             SEBlock(16),
-            nn.Conv2d(16, 16, kernel_size=1),  # Pointwise convolution
+            nn.Conv2d(16, 16, kernel_size=1),
             nn.BatchNorm2d(16),
             nn.SiLU(inplace=True),
         )
         self.classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            nn.Linear(16, num_classes)
+            nn.Linear(16, num_classes),
         )
 
     def forward(self, x):
         x = self.features(x)
         x = self.classifier(x)
         return x
-    
-#ShuffleNet-Inspired Model
+
+# ShuffleNet-Inspired Model: MiniShuffleNet
 class ShuffleLayer(nn.Module):
     def __init__(self, groups):
         super(ShuffleLayer, self).__init__()
@@ -156,10 +150,10 @@ class MiniShuffleNet(nn.Module):
     def __init__(self, num_classes=10, groups=2):
         super(MiniShuffleNet, self).__init__()
         self.features = nn.Sequential(
-            nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1, groups=1),
+            nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1),
             nn.BatchNorm2d(16),
             nn.ReLU(inplace=True),
-            ShuffleLayer(groups),  # Correctly used ShuffleLayer as a module
+            ShuffleLayer(groups),
             nn.Conv2d(16, 32, kernel_size=3, stride=2, padding=1, groups=groups),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
@@ -167,21 +161,21 @@ class MiniShuffleNet(nn.Module):
         self.classifier = nn.Sequential(
             nn.AdaptiveAvgPool2d((1, 1)),
             nn.Flatten(),
-            nn.Linear(32, num_classes)
+            nn.Linear(32, num_classes),
         )
 
     def forward(self, x):
         x = self.features(x)
         x = self.classifier(x)
         return x
-    
-#ResNet-Inspired Model 
+
+# ResNet-Inspired Model: MiniResNet
 class BasicBlock(nn.Module):
     def __init__(self, in_channels, out_channels, stride=1):
         super(BasicBlock, self).__init__()
         self.conv1 = nn.Conv2d(in_channels, out_channels, kernel_size=3, stride=stride, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(out_channels)
-        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, stride=1, padding=1, bias=False)
+        self.conv2 = nn.Conv2d(out_channels, out_channels, kernel_size=3, padding=1, bias=False)
         self.bn2 = nn.BatchNorm2d(out_channels)
 
         self.shortcut = nn.Sequential()
@@ -204,7 +198,7 @@ class MiniResNet(nn.Module):
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=1, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(16)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2)
+        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         # Residual blocks
         self.layer1 = self._make_layer(16, 16, num_blocks=2, stride=1)
@@ -215,23 +209,17 @@ class MiniResNet(nn.Module):
         self.fc = nn.Linear(64, num_classes)
 
     def _make_layer(self, in_channels, out_channels, num_blocks, stride):
-        layers = []
-        layers.append(BasicBlock(in_channels, out_channels, stride))
+        layers = [BasicBlock(in_channels, out_channels, stride)]
         for _ in range(1, num_blocks):
-            layers.append(BasicBlock(out_channels, out_channels, stride=1))
+            layers.append(BasicBlock(out_channels, out_channels))
         return nn.Sequential(*layers)
 
     def forward(self, x):
-        # Initial convolution and activation
         out = self.relu(self.bn1(self.conv1(x)))
-        out = self.maxpool(out)  # Apply MaxPool2d
-        
-        # Residual layers
+        out = self.maxpool(out)
         out = self.layer1(out)
         out = self.layer2(out)
         out = self.layer3(out)
-
-        # Global average pooling and fully connected layer
         out = self.avg_pool(out)
         out = torch.flatten(out, 1)
         out = self.fc(out)
