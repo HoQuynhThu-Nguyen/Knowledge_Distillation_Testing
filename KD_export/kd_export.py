@@ -137,8 +137,17 @@ print("######################################################################")
 print("Instantiate the teacher model.")
 torch.manual_seed(42)
 nn_deep = DeepNN(num_classes=15).to(device)
-print("Cross-entropy runs with teacher model: ")
-train_deep = train(nn_deep, trainloader, valloader, epochs=10, learning_rate=0.001, device=device)
+# print("Cross-entropy runs with teacher model: ")
+# train_deep = train(nn_deep, trainloader, valloader, epochs=10, learning_rate=0.001, device=device)
+# test_deep = test(nn_deep, testloader, device)
+pretrained_teacher = "teacher_model.pth"
+use_cuda=True
+
+# Load the pretrained model
+nn_deep.load_state_dict(torch.load(pretrained_teacher, map_location=device, weights_only=True))
+
+# Set the model in evaluation mode. In this case this is for the Dropout layers
+nn_deep.eval()
 test_deep = test(nn_deep, testloader, device)
 test_accuracy_deep = test_deep[1]["accuracy"] * 100
 print(f"Teacher Accuracy: {test_accuracy_deep:.2f}%")
@@ -159,17 +168,24 @@ new_nn_light = LightNN(num_classes=15).to(device)
 # print("Norm of 1st layer of nn_light:", torch.norm(nn_light.features[0].weight).item())
 # print("Norm of 1st layer of new_nn_light:", torch.norm(new_nn_light.features[0].weight).item())
 
-# print("######################################################################")
-# print("The total number of parameters in each model")
-# total_params_deep = "{:,}".format(sum(p.numel() for p in nn_deep.parameters()))
-# print(f"Teacher model parameters: {total_params_deep}")
-# total_params_light = "{:,}".format(sum(p.numel() for p in nn_light.parameters()))
-# print(f"Student model parameters: {total_params_light}")
+print("######################################################################")
+print("The total number of parameters in each model")
+total_params_deep = "{:,}".format(sum(p.numel() for p in nn_deep.parameters()))
+print(f"Teacher model parameters: {total_params_deep}")
+total_params_light = "{:,}".format(sum(p.numel() for p in nn_light.parameters()))
+print(f"Student model parameters: {total_params_light}")
 
 print()
 print("######################################################################")
 print("Cross-entropy runs with student model: ")
-train_light_ce = train(nn_light, trainloader, valloader, epochs=10, learning_rate=0.001, device=device)
+pretrained_student = "student_model.pth"
+use_cuda=True
+
+# Load the pretrained model
+nn_light.load_state_dict(torch.load(pretrained_student, map_location=device, weights_only=True))
+
+# Set the model in evaluation mode. In this case this is for the Dropout layers
+nn_light.eval()
 test_light_ce = test(nn_light, testloader, device)
 test_accuracy_light_ce = test_light_ce[1]["accuracy"] * 100
 print(f"Student Accuracy: {test_accuracy_light_ce:.2f}%")
@@ -238,8 +254,9 @@ def train_knowledge_distillation(teacher, student, trainloader, valloader, epoch
 print()
 print("######################################################################")
 print("Knowledge Distillation runs with the copy of the student model: ")
-# Apply ``train_knowledge_distillation`` with a temperature of 2. Arbitrarily set the weights to 0.75 for CE and 0.25 for distillation loss.
-train_light_ce_and_kd = train_knowledge_distillation(teacher=nn_deep, student=new_nn_light, trainloader=trainloader, valloader=valloader, epochs=10, learning_rate=0.001, T=2, soft_target_loss_weight=0.25, ce_loss_weight=0.75, device=device)
+# Using temperature T=1, soft target loss weight of 0.25 and CE loss weight of 0.75
+train_light_ce_and_kd = train_knowledge_distillation(teacher=nn_deep, student=new_nn_light, trainloader=trainloader, valloader=valloader,
+                                                     epochs=10, learning_rate=0.001, T=1, soft_target_loss_weight=0.25, ce_loss_weight=0.75, device=device)
 test_light_ce_and_kd = test(new_nn_light, testloader, device)
 test_accuracy_light_ce_and_kd = test_light_ce_and_kd[1]["accuracy"] * 100
 precision_light_ce_and_kd = test_light_ce_and_kd[1]["weighted avg"]["precision"]
@@ -247,9 +264,9 @@ recall_light_ce_and_kd = test_light_ce_and_kd[1]["weighted avg"]["recall"]
 f1_light_ce_and_kd = test_light_ce_and_kd[1]["weighted avg"]["f1-score"]
 
 # Compare the student test accuracy with and without the teacher, after distillation
-# print("-----------------------------------------")
-# print(f"Teacher accuracy: {test_accuracy_deep:.2f}%")
-# print(f"Student accuracy without teacher: {test_accuracy_light_ce:.2f}%")
+print("-----------------------------------------")
+print(f"Teacher accuracy: {test_accuracy_deep:.2f}%")
+print(f"Student accuracy without teacher: {test_accuracy_light_ce:.2f}%")
 
 print("-----------------------------------------")
 print(f"Student accuracy with CE + KD:")
