@@ -2,7 +2,36 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-# Teacher Model: DeepNN
+class DeepNN_Custom(nn.Module):
+    def __init__(self, num_classes=10):
+        super(DeepNN_Custom, self).__init__()
+        self.features = nn.Sequential(
+            nn.Conv2d(3, 128, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(128, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+            nn.Conv2d(64, 64, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.Conv2d(64, 32, kernel_size=3, padding=1),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2, stride=2),
+        )
+        self.classifier = nn.Sequential(
+            nn.AdaptiveAvgPool2d((1,1)),
+            nn.Flatten(),
+            nn.Linear(32, 512),
+            nn.ReLU(),
+            nn.Dropout(0.1),
+            nn.Linear(512, num_classes)
+        )
+
+    def forward(self, x):
+        x = self.features(x)
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
+        return x
+    
 class DeepNN(nn.Module):
     def __init__(self, num_classes=10):
         super(DeepNN, self).__init__()
@@ -30,24 +59,23 @@ class DeepNN(nn.Module):
         x = torch.flatten(x, 1)
         x = self.classifier(x)
         return x
-
-# Student Model: LightNN
+    
 class LightNN(nn.Module):
     def __init__(self, num_classes=10):
         super(LightNN, self).__init__()
         self.features = nn.Sequential(
             nn.Conv2d(3, 16, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
+            nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
-            nn.Conv2d(16, 16, kernel_size=3, padding=1),
-            nn.ReLU(inplace=True),
+            nn.Conv2d(16, 8, kernel_size=3, padding=1),
+            nn.ReLU(),
             nn.MaxPool2d(kernel_size=2, stride=2),
         )
         self.classifier = nn.Sequential(
-            nn.Linear(1024, 256),
-            nn.ReLU(inplace=True),
+            nn.Linear(1024, 64),
+            nn.ReLU(),
             nn.Dropout(0.1),
-            nn.Linear(256, num_classes)
+            nn.Linear(64, num_classes)
         )
 
     def forward(self, x):
